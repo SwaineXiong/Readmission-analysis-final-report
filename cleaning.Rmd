@@ -1,0 +1,97 @@
+---
+title: "Data Cleaning"
+output: html_document
+date: "2024-04-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+
+# Core 2018
+command <- "awk 'NR > 19 {print substr($0, 41, 29)}' '/restricted/projectnb/ma679/Data/FileSpecifications/FileSpecifications_NRD_2018_Core.TXT'"
+output <- trimws(system(command, intern = TRUE))
+print(output)
+core_2018 <- fread('/restricted/projectnb/ma679/Data/NRD_2018_Core.CSV', col.names = output)
+
+# Core 2019
+command <- "awk 'NR > 19 {print substr($0, 41, 29)}' '/restricted/projectnb/ma679/Data/FileSpecifications/FileSpecifications_NRD_2019_Core.TXT'"
+output <- trimws(system(command, intern = TRUE))
+print(output)
+core_2019 <- fread('/restricted/projectnb/ma679/Data/NRD_2019_Core.CSV', col.names = output)
+
+# Core 2020
+command <- "awk 'NR > 19 {print substr($0, 41, 29)}' '/restricted/projectnb/ma679/Data/FileSpecifications/FileSpecifications_NRD_2020_Core.TXT'"
+output <- trimws(system(command, intern = TRUE))
+print(output)
+core_2020 <- fread('/restricted/projectnb/ma679/Data/NRD_2020_Core.CSV', col.names = output)
+
+# Diagnosis and Procedure Groups File (DPGF)
+
+command <- "awk 'NR > 19 {print substr($0, 41, 29)}' '/restricted/projectnb/ma679/Data/FileSpecifications/FileSpecifications_NRD_2018_DX_PR_GRPS.TXT'"
+output <- trimws(system(command, intern = TRUE))
+print(output)
+
+dpgf <- fread('/restricted/projectnb/ma679/Data/NRD_2018_DX_PR_GRPS.CSV', nrows = 10000, col.names = output)
+
+
+
+
+
+# severity
+
+command <- "awk 'NR > 19 {print substr($0, 41, 29)}' '/restricted/projectnb/ma679/Data/FileSpecifications/FileSpecifications_NRD_2018_Severity.TXT'"
+output <- trimws(system(command, intern = TRUE))
+print(output)
+
+severity <- fread('/restricted/projectnb/ma679/Data/NRD_2018_Severity.CSV', col.names = output)
+
+command <- "awk 'NR > 19 {print substr($0, 41, 29)}' '/restricted/projectnb/ma679/Data/FileSpecifications/FileSpecifications_NRD_2018_Hospital.TXT'"
+output <- trimws(system(command, intern = TRUE))
+print(output)
+
+hospital <- fread('/restricted/projectnb/ma679/Data/NRD_2018_Hospital.CSV', col.names = output)
+
+
+```
+
+# 2019 Tracheostomy laryngectomy Mastoditis
+```{r}
+cols_to_select <- grep("^I10_DX", names(core_2018), value = TRUE)
+#cols_to_select <- grep("^I10_PR", names(core_2018), value = TRUE)
+df_selected <- core_2018[,..cols_to_select]
+```
+
+```{r}
+library(dplyr)
+#Laryngectomy
+#values_to_find <- c("0CTS0ZZ", "0CTS3ZZ","0CTS4ZZ","0CTS7ZZ","0CTS8ZZ")
+#rows_with_values <- apply(df_selected, 1, function(x) any(x %in% values_to_find))
+#Mastoditis
+rows_with_values <- apply(df_selected, 1, function(x) any(grepl("^H70", x)))
+#Tracheostomy
+#rows_with_values <- apply(df_selected, 1, function(x) any(grepl("^0B11", x)))
+row_indices <- which(rows_with_values)
+selected_rows_df <- core_2018[row_indices, ]
+core_filtered <- selected_rows_df
+```
+
+
+## Export
+```{r}
+library(dplyr)
+#core_2018_filtered = read.csv("/restricted/projectnb/ma679/ProcessedData/cxxiong/core_2018_filtered_Tracheostomy.csv")
+merged1 <- left_join(core_filtered, hospital, by = "HOSP_NRD")
+print(merged1)
+merged1 <- merged1 %>% mutate(KEY_NRD = as.numeric(KEY_NRD))
+severity <- severity %>% mutate(KEY_NRD = as.numeric(KEY_NRD))
+merged <- left_join(merged1, severity, by = "KEY_NRD")
+print(merged)
+directory_path <- "/restricted/projectnb/ma679/ProcessedData/cxxiong"
+file_path <- file.path(directory_path, "core_2018_merged_Laryngectomy.csv")
+write.csv(merged, file_path, row.names = FALSE)
+```
+
